@@ -14,91 +14,125 @@ cat << 'EOF'
 ======================================================
         By: KaliyugH4cker-Ashwatthama  
 EOF
+function open_in_browser() {
+    url="$1"
+    if [[ -z "$url" ]]; then
+        return
+    fi
+
+    # Detect platform and open browser accordingly
+    if command -v xdg-open > /dev/null; then
+        xdg-open "$url"
+    elif command -v open > /dev/null; then
+        open "$url"  # macOS
+    elif command -v powershell.exe > /dev/null; then
+        powershell.exe start "$url"
+    else
+        echo "Cannot open browser: $url"
+    fi
+
+    sleep 1.5
+}
+
+function generate_dorks() {
+    local domain="$1"
+    local company="$2"
+
+    echo ""
+    echo "--- GitHub Dorks ---"
+    github_dorks=(
+        "site:github.com \"$domain\""
+        "site:github.com \"$domain\" password"
+        "site:github.com \"$domain\" secret"
+        "site:github.com \"$domain\" api_key"
+        "site:github.com \"$domain\" AWS_ACCESS_KEY"
+        "site:github.com \"$domain\" DB_PASSWORD"
+        "site:github.com \"$domain\" filename:.env"
+        "site:github.com \"$domain\" filename:config.json"
+        "site:github.com \"$domain\" filename:.aws/credentials"
+        "site:github.com \"$domain\" filename:id_rsa"
+        "site:github.com \"$domain\" filename:.npmrc"
+        "site:github.com \"$domain\" filename:.bash_history"
+        "site:github.com \"$domain\" filename:.git/config"
+        "site:github.com \"$domain\" filename:.htpasswd"
+        "site:github.com \"$domain\" filename:.docker/config.json"
+        "site:github.com \"$domain\" filename:credentials"
+        "site:github.com \"$domain\" filename:secrets.js"
+        "site:github.com \"$domain\" filename:config.js"
+        "site:github.com \"$domain\" filename:*.js secret"
+    )
+    for dork in "${github_dorks[@]}"; do
+        echo "- $dork"
+        open_in_browser "https://www.google.com/search?q=$dork"
+    done
+
+    echo ""
+    echo "--- Google Dorks ---"
+    google_dorks=(
+        "site:$domain inurl:admin"
+        "site:$domain intitle:\"index of\""
+        "site:$domain ext:sql OR ext:xml OR ext:conf OR ext:log OR ext:old OR ext:backup"
+        "site:$domain inurl:login"
+        "site:$domain \"password\" filetype:xls OR filetype:csv"
+        "site:$domain filetype:env OR filetype:json OR filetype:log OR filetype:ini"
+        "site:$domain filetype:js \"apiKey\" OR \"token\" OR \"secret\""
+        "site:$domain ext:js"
+        "site:$domain ext:git OR inurl:.git"
+        "\"$domain\" AND \"confidential\""
+        "\"$domain\" AND \"internal use only\""
+        "site:$domain inurl:\"wp-config.php\""
+        "site:$domain inurl:\"config.php\""
+        "site:$domain inurl:\"database.yml\""
+        "site:$domain \"Authorization: Basic\""
+        "site:$domain \"Bearer \""
+        "site:$domain intitle:\"Dashboard\" OR intitle:\"Admin Panel\""
+    )
+    for dork in "${google_dorks[@]}"; do
+        echo "- $dork"
+        open_in_browser "https://www.google.com/search?q=$dork"
+    done
+
+    echo ""
+    echo "--- Shodan Queries ---"
+    shodan_dorks=(
+        "hostname:\"$domain\""
+        "ssl.cert.subject.CN:\"$domain\""
+        "http.title:\"$domain\""
+        "ssl:\"$domain\""
+    )
+    if [[ -n "$company" ]]; then
+        shodan_dorks+=("org:\"$company\"")
+    fi
+    for dork in "${shodan_dorks[@]}"; do
+        echo "- $dork"
+        open_in_browser "https://www.shodan.io/search?query=$dork"
+    done
+
+    echo ""
+    echo "--- Other OSINT Tools ---"
+    other_osint=(
+        "https://censys.io/domain?q=$domain"
+        "https://www.zoomeye.org/searchResult?q=$domain"
+        "https://www.binaryedge.io/search?query=$domain"
+        "https://hunter.io/search/$domain"
+        "https://crt.sh/?q=%25.$domain"
+        "https://publicwww.com/websites/%22$domain%22/"
+        "https://dnsdumpster.com/"
+    )
+    for url in "${other_osint[@]}"; do
+        echo "- $url"
+        open_in_browser "$url"
+    done
+}
+
+# Main CLI execution
+print_banner
+echo ""
+read -p "Enter target domain (e.g., example.com): " domain
+read -p "Optional: Enter company name (for Shodan): " company
 
 echo ""
-echo "== Google Dork Generator using Local Wordlist =="
+echo "🚀 Launching dork queries in browser..."
+generate_dorks "$domain" "$company"
 echo ""
-
-# === Colors (Optional: define them or remove if not needed) ===
-YLW='\033[1;33m'
-BLU='\033[1;34m'
-NC='\033[0m' # No Color
-
-# === Inputs ===
-read -p "Enter the target domain (e.g., example.com): " target
-results_dir="./results"
-mkdir -p "$results_dir/Google-dorks"
-
-# === Dork List ===
-printf "$YLW"
-echo -e "\n\n*================{ Google-dorks }===================*\n\n"
-base_dork=(
-"[*] Open Redirect"
-"https://www.google.com/search?q=site:targetdomain inurl:redir | inurl:url | inurl:redirect | inurl:return | inurl:src=http | inurl:r=http"
-"[*] robots.txt"
-"https://www.google.com/search?q=targetdomain+robots.txt"
-"[*] Hunt for Password Files"
-"https://www.google.com/search?q=site:targetdomain 'password' filetype:doc | filetype:pdf | filetype:docx | filetype:xls | filetype:dat | filetype:log"
-"[*] Directory Listing"
-"https://www.google.com/search?q=site:targetdomain intitle:index.of | 'parent directory'"
-"[*] Database Dork"
-"https://www.google.com/search?q=site:targetdomain intext:'sql syntax near' | intext:'syntax error has occurred' | intext:'incorrect syntax near' | intext:'unexpected end of SQL command' | intext:'Warning: mysql_connect()' | intext:'Warning: mysql_query()' | intext:'Warning: pg_connect()' | filetype:sql | ext:sql | ext:dbf | ext:mdb"
-"[*] Config and Log Files"
-"https://www.google.com/search?q=site:targetdomain ext:xml | ext:conf | ext:cnf | ext:reg | ext:inf | ext:rdp | ext:cfg | ext:txt | ext:ora | ext:ini | ext:log"
-"[*] Backup Files"
-"https://www.google.com/search?q=site:targetdomain ext:bkf | ext:bkp | ext:bak | ext:old | ext:backup"
-"[*] Login Pages"
-"https://www.google.com/search?q=site:targetdomain inurl:login | inurl:signin | intitle:Login | intitle:signin | inurl:auth"
-"[*] PHP Info"
-"https://www.google.com/search?q=site:targetdomain ext:php intitle:phpinfo 'published by the PHP Group'"
-"[*] GitHub Dork"
-"https://github.com/search?q=targetdomain"
-"[*] Subdomain Enumeration Dork"
-"https://www.google.com/search?q=site:*.targetdomain"
-"[*] Reverse IP Lookup"
-"https://viewdns.info/reverseip/?host=targetdomain&t=1"
-"[*] cert.sh Check"
-"https://crt.sh/?q=targetdomain"
-"[*] AWS S3 Buckets"
-"https://www.google.com/search?q=site:.s3.amazonaws.com 'targetdomain'"
-"[*] StackOverflow Dork"
-"https://www.google.com/search?q=site:stackoverflow.com 'targetdomain'"
-"[*] Pastebin Lookup"
-"https://www.google.com/search?q=site:pastebin.com | site:paste2.org | site:pastehtml.com | site:slexy.org | site:snipplr.com | site:snipt.net | site:textsnip.com | site:bitpaste.app | site:justpaste.it | site:heypasteit.com | site:hastebin.com | site:dpaste.org | site:dpaste.com | site:codepad.org | site:jsitor.com | site:codepen.io | site:jsfiddle.net | site:dotnetfiddle.net | site:phpfiddle.org | site:ide.geeksforgeeks.org | site:repl.it | site:ideone.com | site:paste.debian.net | site:paste.org | site:paste.org.ru | site:codebeautify.org | site:codeshare.io | site:trello.com 'targetdomain'"
-"[*] WhatCMS Check"
-"https://whatcms.org/?s=targetdomain"
-"[*] WP-Content Dork"
-"https://www.google.com/search?q=site:targetdomain inurl:wp- | inurl:wp-content | inurl:plugins | inurl:uploads | inurl:themes | inurl:download"
-"[*] Web Archive"
-"http://wwwb-dedup.us.archive.org:8083/cdx/search?url=targetdomain/&matchType=domain&collapse=digest&output=text&fl=original,timestamp&filter=urlkey:.*wp[-].*&limit=1000000&xx="
-"[*] WordPress Deep Search"
-"https://www.google.com/search?q=site:targetdomain inurl:php?=id1 | inurl:index.php?id= | inurl:pageid= | inurl:.php?"
-"[*] SSL Server Test"
-"https://www.ssllabs.com/ssltest/analyze.html?d=targetdomain"
-"[*] Wayback Machine"
-"https://web.archive.org/web/*/targetdomain/*"
-"[*] SHODAN Search"
-"https://www.shodan.io/search?query=targetdomain"
-"[*] Search in grep.app"
-"https://grep.app/search?q=targetdomain"
-"[*] Security Headers"
-"https://securityheaders.com/?q=targetdomain&followRedirects=on"
-)
-
-# === Generate Dorks ===
-printf "$BLU"
-output_file="$results_dir/Google-dorks/google-dorks.txt"
-> "$output_file"
-
-counter=0
-for dork in "${base_dork[@]}"; do
-  new_dork=$(echo "$dork" | sed "s/targetdomain/$target/g")
-  echo "$new_dork" >> "$output_file"
-  counter=$((counter+1))
-  if [ $((counter % 2)) -eq 0 ]; then
-    echo "" >> "$output_file"
-  fi
-done
-
-echo -e "$NC"
-cat "$output_file"
+echo "✅ Done! All tabs opened."
