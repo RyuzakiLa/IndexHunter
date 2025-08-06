@@ -125,8 +125,7 @@ function generate_dorks() {
     done
 }
 
-# Main CLI execution
-print_banner
+# Main CLI execution print_banner
 echo ""
 read -p "Enter target domain (e.g., example.com): " domain
 read -p "Optional: Enter company name (for Shodan): " company
